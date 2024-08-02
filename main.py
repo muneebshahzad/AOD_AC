@@ -174,35 +174,35 @@ async def process_order(session, order):
     print(order)
     tags = []
     try:
-    name = order.billing_address.name
-except AttributeError:
-    name = " "
-    print("Error retrieving name")
+        name = order.billing_address.name
+    except AttributeError:
+        name = " "
+        print("Error retrieving name")
 
-try:
-    address = order.billing_address.address1
-except AttributeError:
-    address = " "
-    print("Error retrieving address")
+    try:
+        address = order.billing_address.address1
+    except AttributeError:
+        address = " "
+        print("Error retrieving address")
 
-try:
-    city = order.billing_address.city
-except AttributeError:
-    city = " "
-    print("Error retrieving city")
+    try:
+        city = order.billing_address.city
+    except AttributeError:
+        city = " "
+        print("Error retrieving city")
 
-try:
-    phone = order.billing_address.phone
-except AttributeError:
-    phone = " "
-    print("Error retrieving phone")
+    try:
+        phone = order.billing_address.phone
+    except AttributeError:
+        phone = " "
+        print("Error retrieving phone")
 
-customer_details = {
-    "name": name,
-    "address": address,
-    "city": city,
-    "phone": phone
-}
+    customer_details = {
+        "name": name,
+        "address": address,
+        "city": city,
+        "phone": phone
+    }
     order_info = {
         'order_id': order.order_number,
         'tracking_id': 'N/A',
