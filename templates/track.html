@@ -208,7 +208,7 @@
                         <!-- Nav Item - User Information -->
                         <li class="nav-item dropdown no-arrow">
                             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">Zarak</span>
+                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">Ali Malik</span>
                                 <img class="img-profile rounded-circle" src="static/img/undraw_profile.svg">
                             </a>
                             <!-- Dropdown - User Information -->
@@ -440,22 +440,20 @@
     <script src="static/assets/js/track.js"></script>
 
 <script>
-
-
     $(document).ready(function() {
-        var table = $('#dataTable').DataTable();
-     if ($.fn.DataTable.isDataTable('#dataTable')) {
-        table.destroy();
-    }
+        // Check if the table is already a DataTable and destroy it if necessary
+        if ($.fn.DataTable.isDataTable('#dataTable')) {
+            $('#dataTable').DataTable().destroy();
+        }
 
+        // Initialize the DataTable with desired settings
         $('#dataTable').DataTable({
             "columnDefs": [
-                { "searchable": false, "targets": -1,4 }  // Make the last column non-searchable
+                { "searchable": false, "targets": [-1, 4] }  // Make the last column and the 5th column non-searchable
             ]
         });
     });
 </script>
-
 <script>
         $(document).ready(function() {
             var currentUrl = window.location.pathname;
