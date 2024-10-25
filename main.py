@@ -100,6 +100,9 @@ def send_email():
         return jsonify({'error': str(e)}), 500
 
 async def fetch_tracking_data(session, tracking_number):
+
+    url = f"https://cod.callcourier.com.pk/api/CallCourier/GetTackingHistory?cn={tracking_number}"
+    async with session.get(url) as response:
         return await response.json()
 
 async def process_line_item(session, line_item, fulfillments):
