@@ -103,15 +103,204 @@ async def fetch_tracking_data(session, tracking_number):
         return await response.json()
 
 async def process_line_item(session, line_item, fulfillments):
+    if line_item.fulfillment_status is None and line_item.fulfillable_quantity == 0:
+        return []
+
+    tracking_info = []
+
+    if line_item.fulfillment_status == "fulfilled":
+        for fulfillment in fulfillments:
+            if fulfillment.status == "cancelled":
+                continue
+            for item in fulfillment.line_items:
+                if item.id == line_item.id:
+                    tracking_number = fulfillment.tracking_number
+                    data = await fetch_tracking_data(session, tracking_number)
+
+                    if data:
+                        consignment_list = data
+                        if consignment_list:
+                            tracking_details = consignment_list
+                            if tracking_details:
+                                try:
+                                    final_status = tracking_details[-1].get('ProcessDescForPortal')
+                                except:
+                                    final_status = 'N/A'
+
+                            else:
+                                final_status = "Booked"
+                                print("No tracking details available.")
+                        else:
+                            final_status = "Booked"
+                            print("No packets found.")
+                    else:
+                        final_status = "N/A"
+                        print("Error fetching data.")
+
+                    # Track quantity for each tracking number
+                    tracking_info.append({
+                        'tracking_number': tracking_number,
+                        'status': final_status,
+                        'quantity': item.quantity
+                    })
+
+    return tracking_info if tracking_info else [
         {"tracking_number": "N/A", "status": "Un-Booked", "quantity": line_item.quantity}]
 
 async def process_order(session, order):
+    order_start_time = time.time()
+
+    input_datetime_str = order.created_at
+    parsed_datetime = datetime.fromisoformat(input_datetime_str[:-6])
+    formatted_datetime = parsed_datetime.strftime("%b %d, %Y")
+
+    try:
+        status = (order.fulfillment_status).title()
+    except:
+        status = "Un-fulfilled"
+    print(order)
+    tags = []
+    try:
+        name = order.billing_address.name
+    except AttributeError:
+        name = " "
+        print("Error retrieving name")
+
+    try:
+        address = order.billing_address.address1
+    except AttributeError:
+        address = " "
+        print("Error retrieving address")
+
+    try:
+        city = order.billing_address.city
+    except AttributeError:
+        city = " "
+        print("Error retrieving city")
+
+    try:
+        phone = order.billing_address.phone
+    except AttributeError:
+        phone = " "
+        print("Error retrieving phone")
+
+    customer_details = {
+        "name": name,
+        "address": address,
+        "city": city,
+        "phone": phone
+    }
+    order_info = {
+        'order_id': order.order_number,
+        'tracking_id': 'N/A',
+        'created_at': formatted_datetime,
+        'total_price': order.total_price,
+        'line_items': [],
+        'financial_status': (order.financial_status).title(),
+        'fulfillment_status': status,
+        'customer_details' : customer_details,
+        'tags': order.tags.split(", "),
+        'id': order.id
+    }
+    print(order.tags)
+
+    tasks = []
+    for line_item in order.line_items:
+        tasks.append(process_line_item(session, line_item, order.fulfillments))
+
+    results = await asyncio.gather(*tasks)
+    variant_name = ""
+    for tracking_info_list, line_item in zip(results, order.line_items):
+        if tracking_info_list is None:
+            continue
+
+        if line_item.product_id is not None:
+            product = shopify.Product.find(line_item.product_id)
+            if product and product.variants:
+                for variant in product.variants:
+                    if variant.id == line_item.variant_id:
+                        if variant.image_id is not None:
+                            images = shopify.Image.find(image_id=variant.image_id, product_id=line_item.product_id)
+                            variant_name = line_item.variant_title
+                            for image in images:
+                                if image.id == variant.image_id:
+                                    image_src = image.src
+                        else:
+                            variant_name = ""
+                            image_src = product.image.src
+        else:
+            image_src = "https://static.thenounproject.com/png/1578832-200.png"
+
+        for info in tracking_info_list:
+            order_info['line_items'].append({
+                'fulfillment_status': line_item.fulfillment_status,
+                'image_src': image_src,
+                'product_title': (line_item.title or "") + " - " + (variant_name or ""),
+                'quantity': info['quantity'],
+                'tracking_number': info['tracking_number'],
+                'status': info['status']
+            })
+            order_info['status'] = info['status']
+
+    order_end_time = time.time()
+    print(f"Time taken to process order {name} {order.order_number}: {order_end_time - order_start_time:.2f} seconds")
+
     return order_info
 
 
 
 @app.route('/apply_tag', methods=['POST'])
 def apply_tag():
+    data = request.json
+    order_id = data.get('order_id')
+    tag = data.get('tag')
+
+    # Get today's date in YYYY-MM-DD format
+    today_date = datetime.now().strftime('%Y-%m-%d')
+    tag_with_date = f"{tag.strip()} ({today_date})"
+
+    try:
+        # Fetch the order
+        order = shopify.Order.find(order_id)
+
+        # If the tag is "Returned", cancel the order
+        if tag.strip().lower() == "returned":
+            # Attempt to cancel the order
+            if order.cancel():
+                print("Order Cancelled")
+            else:
+                print("Order Cancellation Failed")
+        if tag.strip().lower() == "delivered":
+            if order.close():
+                print("Order Cloed")
+            else:
+                print("Order Closing Failed")
+
+        # Process existing tags
+        if order.tags:
+            tags = [t.strip() for t in order.tags.split(", ")]  # Remove excess spaces
+        else:
+            tags = []
+
+        # Remove a specific tag if needed (e.g., "Leopards Courier")
+        if "Leopards Courier" in tags:
+            tags.remove("Leopards Courier")
+
+        # Add new tag if it doesn't already exist
+        if tag_with_date not in tags:
+            tags.append(tag_with_date)
+
+        # Update the order with the new tags
+        order.tags = ", ".join(tags)
+
+        # Save the order
+        if order.save():
+            return jsonify({"success": True, "message": "Tag applied successfully."})
+        else:
+            return jsonify({"success": False, "error": "Failed to save order changes."})
+
+    except Exception as e:
+        print(f"Error: {e}")
         return jsonify({"success": False, "error": str(e)})
 
 async def getShopifyOrders():
