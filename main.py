@@ -553,7 +553,6 @@ password = os.getenv('PASSWORD')
 shopify.ShopifyResource.set_site(shop_url)
 shopify.ShopifyResource.set_user(api_key)
 shopify.ShopifyResource.set_password(password)
-order_details = asyncio.run(getShopifyOrders())
 
 if __name__ == "__main__":
     shop_url = os.getenv('SHOP_URL')
