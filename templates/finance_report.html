@@ -255,7 +255,7 @@ $(document).ready(function() {
         var totalExpense = 0;
 
         filteredData.each(function (rowData) {
-            var amount = parseFloat(rowData[2]);  // Assuming amount is in the 3rd column (index 2)
+            var amount = parseFloat(rowData[3]);  // Assuming amount is in the 3rd column (index 2)
             var type = rowData[1];  // Assuming transaction type is in the 2nd column (index 1)
 
             if (type === 'Income') {
